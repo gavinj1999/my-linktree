@@ -1,15 +1,40 @@
 <script>
   import { links } from '$lib/stores/links';
+  import { auth } from '$lib/stores/auth';
+  import { goto } from '$app/navigation';
+
   let profile = {
     name: 'Your Name',
     bio: 'Welcome to my Linktree! Connect with me below.',
     avatar: '/assets/profile.jpg'
   };
+
+  function handleAuth() {
+    if ($auth.isAuthenticated) {
+      auth.set({ isAuthenticated: false, user: null });
+    } else {
+      goto('/login');
+    }
+  }
 </script>
 
 <svelte:head>
   <title>My Linktree</title>
 </svelte:head>
+
+<header>
+  <nav class="menu">
+    <a href="/" class="logo">My Linktree</a>
+    <div class="menu-right">
+      {#if $auth.isAuthenticated}
+        <a href="/add-link">Manage Links</a>
+        <button on:click={handleAuth}>Logout</button>
+      {:else}
+        <button on:click={handleAuth}>Login</button>
+      {/if}
+    </div>
+  </nav>
+</header>
 
 <main>
   <div class="container">
@@ -37,9 +62,62 @@
     margin: 0;
   }
 
+  header {
+    background-color: #1a2b2e;
+    padding: 1rem 2rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  }
+
+  .menu {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .logo {
+    font-size: 1.5rem;
+    color: #ffddd2;
+    text-decoration: none;
+    font-weight: bold;
+  }
+
+  .menu-right {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .menu-right a {
+    color: #83c5be;
+    text-decoration: none;
+    font-size: 1rem;
+    transition: color 0.3s;
+  }
+
+  .menu-right a:hover {
+    color: #e29578;
+  }
+
+  .menu-right button {
+    padding: 0.5rem 1rem;
+    background-color: #006d77;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.2s;
+  }
+
+  .menu-right button:hover {
+    background-color: #83c5be;
+    transform: scale(1.02);
+  }
+
   .container {
     max-width: 600px;
-    margin: 0 auto;
+    margin: 2rem auto;
     padding: 2rem;
     background-color: #1a2b2e;
     border-radius: 12px;
@@ -110,6 +188,16 @@
     .link {
       font-size: 1rem;
       padding: 0.8rem;
+    }
+
+    .menu {
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .menu-right {
+      flex-direction: column;
+      gap: 0.5rem;
     }
   }
 </style>

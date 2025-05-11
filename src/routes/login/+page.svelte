@@ -1,19 +1,39 @@
 <script>
+  import { supabase } from '$lib/supabase';
   import { auth } from '$lib/stores/auth';
   import { goto } from '$app/navigation';
 
-  let username = '';
+  let email = '';
   let password = '';
   let error = '';
 
-  function login() {
-    // Static credentials for simplicity (replace with backend auth for production)
-    if (username === 'admin' && password === 'password123') {
-      auth.set({ isAuthenticated: true });
-      goto('/add-link');
-    } else {
-      error = 'Invalid username or password';
+  async function login() {
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (signInError) {
+      error = signInError.message;
+      return;
     }
+
+    auth.set({ isAuthenticated: true, user: data.user });
+    goto('/add-link');
+  }
+
+  async function signUp() {
+    const { error: signUpError } = await supabase.auth.signUp({
+      email,
+      password
+    });
+
+    if (signUpError) {
+      error = signUpError.message;
+      return;
+    }
+
+    error = 'Check your email for a confirmation link!';
   }
 </script>
 
@@ -23,16 +43,17 @@
 
 <main>
   <div class="container">
-    <h1>Login</h1>
+    <h1>Login or Sign Up</h1>
     {#if error}
       <p class="error">{error}</p>
     {/if}
     <div class="form">
-      <label for="username">Username</label>
-      <input id="username" type="text" bind:value={username} aria-label="Username" />
+      <label for="email">Email</label>
+      <input id="email" type="email" bind:value={email} aria-label="Email" />
       <label for="password">Password</label>
       <input id="password" type="password" bind:value={password} aria-label="Password" />
       <button on:click={login}>Login</button>
+      <button class="signup" on:click={signUp}>Sign Up</button>
     </div>
   </div>
 </main>
@@ -107,6 +128,16 @@
   button:hover {
     background-color: #83c5be;
     transform: scale(1.02);
+  }
+
+  .signup {
+    background-color: #e29578;
+    margin-top: 1rem;
+  }
+
+  .signup:hover {
+    background-color: #ffddd2;
+    color: #006d77;
   }
 
   @media (max-width: 480px) {
