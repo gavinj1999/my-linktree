@@ -2,32 +2,79 @@
   import { links } from '$lib/stores/links';
   import { auth } from '$lib/stores/auth';
   import { goto } from '$app/navigation';
+  import { supabase } from '$lib/supabase';
 
-  let newLink = { title: '', url: '', color: '#83c5be' };
+  let newLink = { id: null, title: '', url: '', color: '#83c5be' };
   let error = '';
 
   if (!$auth.isAuthenticated) {
     goto('/login');
   }
 
-  function addLink() {
+  async function addOrUpdateLink() {
     if (!newLink.title || !newLink.url) {
       error = 'Please fill in both title and URL';
       return;
     }
-    links.update((current) => [...current, { ...newLink }]);
-    newLink = { title: '', url: '', color: '#83c5be' };
+
+    const linkData = {
+      title: newLink.title,
+      url: newLink.url,
+      color: newLink.color,
+      user_id: $auth.user.id
+    };
+
+    let response;
+    if (newLink.id) {
+      response = await supabase
+        .from('links')
+        .update(linkData)
+        .eq('id', newLink.id)
+        .eq('user_id', $auth.user.id);
+    } else {
+      response = await supabase.from('links').insert([linkData]);
+    }
+
+    if (response.error) {
+      error = response.error.message;
+      return;
+    }
+
+    const { data } = await supabase.from('links').select('*').eq('user_id', $auth.user.id);
+    links.set(data || []);
+    newLink = { id: null, title: '', url: '', color: '#83c5be' };
+    error = '';
+  }
+
+  async function editLink(link) {
+    newLink = { ...link };
+  }
+
+  async function deleteLink(id) {
+    const { error: deleteError } = await supabase
+      .from('links')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', $auth.user.id);
+
+    if (deleteError) {
+      error = deleteError.message;
+      return;
+    }
+
+    const { data } = await supabase.from('links').select('*').eq('user_id', $auth.user.id);
+    links.set(data || []);
     error = '';
   }
 </script>
 
 <svelte:head>
-  <title>Add Link</title>
+  <title>Manage Links</title>
 </svelte:head>
 
 <main>
   <div class="container">
-    <h1>Add a New Link</h1>
+    <h1>Manage Links</h1>
     {#if error}
       <p class="error">{error}</p>
     {/if}
@@ -38,8 +85,23 @@
       <input id="link-url" type="url" bind:value={newLink.url} aria-label="URL" />
       <label for="link-color">Color</label>
       <input id="link-color" type="color" bind:value={newLink.color} />
-      <button on:click={addLink}>Add Link</button>
-      <button class="logout" on:click={() => auth.set({ isAuthenticated: false })}>Logout</button>
+      <button on:click={addOrUpdateLink}>{newLink.id ? 'Update Link' : 'Add Link'}</button>
+    </div>
+    <div class="links-list">
+      <h2>Your Links</h2>
+      {#if $links.length === 0}
+        <p>No links yet.</p>
+      {:else}
+        {#each $links as link}
+          <div class="link-item">
+            <span>{link.title}</span>
+            <div class="link-actions">
+              <button class="edit" on:click={() => editLink(link)}>Edit</button>
+              <button class="delete" on:click={() => deleteLink(link.id)}>Delete</button>
+            </div>
+          </div>
+        {/each}
+      {/if}
     </div>
   </div>
 </main>
@@ -65,6 +127,12 @@
     font-size: 1.8rem;
     color: #ffddd2;
     margin-bottom: 1rem;
+  }
+
+  h2 {
+    font-size: 1.4rem;
+    color: #ffddd2;
+    margin: 2rem 0 1rem;
   }
 
   .error {
@@ -111,17 +179,54 @@
     transition: background-color 0.3s, transform 0.2s;
   }
 
-  button:hover {
+  button:hover:not(:disabled) {
     background-color: #83c5be;
     transform: scale(1.02);
   }
 
-  .logout {
-    background-color: #e29578;
-    margin-top: 1rem;
+  button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
-  .logout:hover {
+  .links-list {
+    margin-top: 2rem;
+    text-align: left;
+  }
+
+  .link-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    background-color: #2e3f42;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+  }
+
+  .link-item span {
+    color: #ffddd2;
+    font-size: 1rem;
+  }
+
+  .link-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .edit {
+    background-color: #83c5be;
+  }
+
+  .edit:hover:not(:disabled) {
+    background-color: #006d77;
+  }
+
+  .delete {
+    background-color: #e29578;
+  }
+
+  .delete:hover:not(:disabled) {
     background-color: #ffddd2;
     color: #006d77;
   }
@@ -136,8 +241,18 @@
       font-size: 1.5rem;
     }
 
+    h2 {
+      font-size: 1.2rem;
+    }
+
     button {
       padding: 0.6rem;
+    }
+
+    .link-item {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
     }
   }
 </style>

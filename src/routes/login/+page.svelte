@@ -6,15 +6,18 @@
   let email = '';
   let password = '';
   let error = '';
+  let loading = false;
 
   async function login() {
+    loading = true;
     const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password
     });
 
+    loading = false;
     if (signInError) {
-      error = signInError.message;
+      error = signInError.message === 'Invalid login credentials' ? 'Incorrect email or password' : signInError.message;
       return;
     }
 
@@ -23,17 +26,42 @@
   }
 
   async function signUp() {
-    const { error: signUpError } = await supabase.auth.signUp({
+    loading = true;
+    const { data, error: signUpError } = await supabase.auth.signUp({
       email,
-      password
+      password,
+      options: {
+        emailRedirectTo: 'https://my-linktree.vercel.app/add-link' // Update to your Vercel URL
+      }
     });
 
+    loading = false;
     if (signUpError) {
-      error = signUpError.message;
+      error = signUpError.message === 'User already registered' ? 'Email already in use. Try resending confirmation.' : signUpError.message;
       return;
     }
 
-    error = 'Check your email for a confirmation link!';
+    if (data.user && !data.user.email_confirmed_at) {
+      error = 'Check your email for a confirmation link!';
+      email = '';
+      password = '';
+    }
+  }
+
+  async function resendConfirmation() {
+    loading = true;
+    const { error: resendError } = await supabase.auth.resend({
+      type: 'signup',
+      email
+    });
+
+    loading = false;
+    if (resendError) {
+      error = resendError.message;
+      return;
+    }
+
+    error = 'Confirmation email resent. Check your email!';
   }
 </script>
 
@@ -49,11 +77,18 @@
     {/if}
     <div class="form">
       <label for="email">Email</label>
-      <input id="email" type="email" bind:value={email} aria-label="Email" />
+      <input id="email" type="email" bind:value={email} aria-label="Email" disabled={loading} />
       <label for="password">Password</label>
-      <input id="password" type="password" bind:value={password} aria-label="Password" />
-      <button on:click={login}>Login</button>
-      <button class="signup" on:click={signUp}>Sign Up</button>
+      <input id="password" type="password" bind:value={password} aria-label="Password" disabled={loading} />
+      <button on:click={login} disabled={loading}>
+        {#if loading && !error.includes('resend')}Logging in...{:else}Login{/if}
+      </button>
+      <button class="signup" on:click={signUp} disabled={loading}>
+        {#if loading && !error.includes('resend')}Signing up...{:else}Sign Up{/if}
+      </button>
+      <button class="resend" on:click={resendConfirmation} disabled={loading}>
+        {#if loading && error.includes('resend')}Resending...{:else}Resend Confirmation Email{/if}
+      </button>
     </div>
   </div>
 </main>
@@ -114,6 +149,11 @@
     outline: none;
   }
 
+  input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
   button {
     padding: 0.75rem;
     font-size: 1rem;
@@ -125,9 +165,14 @@
     transition: background-color 0.3s, transform 0.2s;
   }
 
-  button:hover {
+  button:hover:not(:disabled) {
     background-color: #83c5be;
     transform: scale(1.02);
+  }
+
+  button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   .signup {
@@ -135,9 +180,18 @@
     margin-top: 1rem;
   }
 
-  .signup:hover {
+  .signup:hover:not(:disabled) {
     background-color: #ffddd2;
     color: #006d77;
+  }
+
+  .resend {
+    background-color: #83c5be;
+    margin-top: 1rem;
+  }
+
+  .resend:hover:not(:disabled) {
+    background-color: #006d77;
   }
 
   @media (max-width: 480px) {
